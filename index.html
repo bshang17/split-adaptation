@@ -1,0 +1,570 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Split Adaptation for Pre-trained Vision Transformers</title>
+<meta name="description" content="Split Adaptation (SA) adapts a pre-trained ViT to a downstream task from only a few labeled examples while protecting both the client's data and the server's model: only a low-bit quantized, noise-perturbed frontend is shared. CVPR 2025.">
+<meta property="og:title" content="Split Adaptation for Pre-trained Vision Transformers">
+<meta property="og:description" content="Adapt a pre-trained ViT from a few shots while protecting both data and model — the client only ever sees a low-bit quantized, noise-perturbed frontend. CVPR 2025.">
+<meta property="og:type" content="article">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="theme-color" content="#ffffff">
+
+<!-- Deployed at https://bshang17.github.io/split-adaptation/ (GitHub Pages). og:* + canonical are absolute
+     as required; all other hrefs are relative or real external URLs. -->
+<meta property="og:url" content="https://bshang17.github.io/split-adaptation/">
+<link rel="canonical" href="https://bshang17.github.io/split-adaptation/">
+<meta property="og:image" content="https://bshang17.github.io/split-adaptation/og-image.png">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="630">
+<meta property="og:image:alt" content="Split Adaptation: 5-shot accuracy 81.98 on CIFAR-100 while degrading data-reconstruction quality far below split learning.">
+
+<!-- Highwire tags — Google Scholar reads ONLY these, not JSON-LD. One
+     citation_author per author, in paper order, "Last, First". These are the
+     camera-ready (non-anonymous) author names from the CVPR main.tex. -->
+<meta name="citation_title" content="Split Adaptation for Pre-trained Vision Transformers">
+<meta name="citation_author" content="Wang, Lixu">
+<meta name="citation_author" content="Shang, Bingqi">
+<meta name="citation_author" content="Li, Yi">
+<meta name="citation_author" content="Mohapatra, Payal">
+<meta name="citation_author" content="Dong, Wei">
+<meta name="citation_author" content="Wang, Xiao">
+<meta name="citation_author" content="Zhu, Qi">
+<meta name="citation_conference_title" content="IEEE/CVF Conference on Computer Vision and Pattern Recognition (CVPR)">
+<meta name="citation_publication_date" content="2025">
+<meta name="citation_pdf_url" content="https://arxiv.org/pdf/2503.00441">
+<meta name="citation_arxiv_id" content="2503.00441">
+
+<script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@type": "ScholarlyArticle",
+  "name": "Split Adaptation for Pre-trained Vision Transformers",
+  "headline": "Split Adaptation for Pre-trained Vision Transformers",
+  "description": "A split-adaptation method that adapts a pre-trained ViT to a downstream task from a few labeled examples while protecting both client data and the server's model.",
+  "author": [
+    {"@type": "Person", "name": "Lixu Wang"},
+    {"@type": "Person", "name": "Bingqi Shang"},
+    {"@type": "Person", "name": "Yi Li"},
+    {"@type": "Person", "name": "Payal Mohapatra"},
+    {"@type": "Person", "name": "Wei Dong"},
+    {"@type": "Person", "name": "Xiao Wang"},
+    {"@type": "Person", "name": "Qi Zhu"}
+  ],
+  "datePublished": "2025",
+  "publication": "IEEE/CVF Conference on Computer Vision and Pattern Recognition (CVPR) 2025",
+  "sameAs": "https://arxiv.org/abs/2503.00441"
+}
+</script>
+
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><rect width='32' height='32' rx='7' fill='%231e293b'/><rect x='6' y='9' width='9' height='14' rx='2' fill='%232563eb'/><rect x='17' y='9' width='9' height='14' rx='2' fill='%2394a3b8'/></svg>">
+
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+
+<link rel="stylesheet" href="static/css/bulma.min.css">
+<link rel="stylesheet" href="static/css/paper.css">
+</head>
+<body>
+
+<header>
+  <div class="container is-max-desktop bar">
+    <span class="brand">Split&nbsp;Adaptation</span>
+    <nav>
+      <a href="#abstract">Abstract</a>
+      <a href="#problem">Problem</a>
+      <a href="#method">Method</a>
+      <a href="#results">Results</a>
+      <a href="#protection">Protection</a>
+      <a href="#cite">Cite</a>
+    </nav>
+  </div>
+</header>
+
+<main id="main-content">
+
+<!-- ══ HERO ══════════════════════════════════════════════════════════ -->
+<section class="hero">
+  <div class="hero-body">
+    <div class="container is-max-desktop">
+      <div class="columns is-centered">
+        <div class="column is-four-fifths has-text-centered">
+      <h1>Split Adaptation for Pre-trained Vision Transformers</h1>
+
+      <p class="authors">
+        Lixu Wang<sup>1,2,</sup><sup class="eqmark">*</sup>,
+        Bingqi Shang<sup>1,</sup><sup class="eqmark">*</sup>,
+        Yi Li<sup>1</sup>,
+        Payal Mohapatra<sup>1</sup>,
+        Wei Dong<sup>2</sup>,
+        Xiao Wang<sup>1</sup>,
+        Qi Zhu<sup>1</sup>
+      </p>
+      <p class="affil">
+        <sup>1</sup>Northwestern University&nbsp;&nbsp;
+        <sup>2</sup>Nanyang Technological University&nbsp;&nbsp;
+        <span class="eqmark">*</span>Equal contribution
+        <br>CVPR 2025
+      </p>
+
+      <p class="tldr">
+        Adapting a pre-trained ViT to a new task usually means the client hands over its data, or the server
+        hands over its model. <b>Split Adaptation (SA)</b> does neither: it shares only a <b>low-bit quantized,
+        noise-perturbed frontend</b>, adapts from just a few labeled examples, and — across three datasets —
+        matches or beats strong baselines while leaking neither the model nor the data, at a fraction of the
+        client compute.
+      </p>
+
+      <div class="btns">
+        <a class="btn" href="https://arxiv.org/pdf/2503.00441" target="_blank" rel="noopener">
+          <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" aria-hidden="true"><path d="M4 1.5h5L12.5 5v9.5h-9z"/><path d="M9 1.5V5h3.5"/></svg>
+          Paper (PDF)
+        </a>
+        <a class="btn ghost" href="https://arxiv.org/abs/2503.00441" target="_blank" rel="noopener">
+          <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" aria-hidden="true"><path d="M2 3.5h12v9H2z"/><path d="M2 6.5h12"/></svg>
+          arXiv
+        </a>
+        <a class="btn ghost" href="https://github.com/conditionWang/Split_Adaptation" target="_blank" rel="noopener">
+          <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" aria-hidden="true"><path d="M6 12.5c-3 .9-3-1.4-4-1.7M10 14v-2.3a2 2 0 0 0-.6-1.6c1.9-.2 3.9-.9 3.9-4.2a3.3 3.3 0 0 0-.9-2.3 3 3 0 0 0-.1-2.3s-.8-.2-2.5.9a8.6 8.6 0 0 0-4.5 0C3.6 1.1 2.8 1.3 2.8 1.3a3 3 0 0 0-.1 2.3 3.3 3.3 0 0 0-.9 2.3c0 3.3 2 4 3.9 4.2a2 2 0 0 0-.6 1.5V14"/></svg>
+          Code
+        </a>
+        <a class="btn ghost" href="#cite">
+          <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" aria-hidden="true"><path d="M3 3.5h10M3 8h10M3 12.5h6"/></svg>
+          BibTeX
+        </a>
+        </div><!-- /.btns -->
+
+      <figure id="fig-1" class="figure-block teaser">
+        <img src="figs/teaser_fig.png" width="1872" height="1009" loading="eager" decoding="async"
+             alt="Three adaptation paradigms compared. Linear Probing keeps the whole ViT on the server and exposes client data. Split Learning splits the model but leaks representations and exposes the frontend. Split Adaptation sends only a noisy, INT8-quantized frontend to the client and tunes the backend on the server.">
+        <figcaption><b>Figure 1.</b> Downstream adaptation paradigms under the two-party server&ndash;client setting.
+          Linear probing and split learning either expose client data or the server's model; Split Adaptation shares
+          only a low-bit quantized, noise-perturbed frontend, protecting both the model and the data while keeping
+          client computation small.</figcaption>
+      </figure>
+        </div><!-- /.column -->
+      </div><!-- /.columns -->
+    </div><!-- /.container -->
+  </div><!-- /.hero-body -->
+</section>
+
+<!-- ══ ABSTRACT ══════════════════════════════════════════════════════ -->
+<section class="section is-tinted" id="abstract">
+  <div class="container is-max-desktop">
+    <div class="columns is-centered">
+      <div class="column is-four-fifths">
+    <h2>Abstract</h2>
+    <p class="abstract">
+      Vision Transformers (ViTs), extensively pre-trained on large-scale datasets, have become fundamental to
+      foundation models, enabling adaptation to diverse downstream tasks. Existing adaptation methods typically
+      require direct data access, rendering them infeasible in privacy-sensitive domains where clients are often
+      reluctant to share their data. A straightforward solution may be sending the pre-trained ViT to clients for
+      local adaptation, which poses issues of model intellectual property and incurs heavy client computation
+      overhead. To address these issues, we propose a novel <em>split adaptation</em> (SA) method that enables
+      effective downstream adaptation while protecting data and models. SA, inspired by split learning (SL),
+      segments the pre-trained ViT into a frontend and a backend, with only the frontend shared with the client for
+      data representation extraction. But unlike regular SL, SA replaces frontend parameters with low-bit quantized
+      values, preventing direct exposure of the model. SA allows the client to add bi-level noise to the frontend
+      and the extracted data representations, ensuring data protection. Accordingly, SA incorporates data-level and
+      model-level out-of-distribution enhancements to mitigate noise injection's impact. Our SA focuses on the
+      challenging few-shot adaptation and adopts patch retrieval augmentation for overfitting alleviation. Extensive
+      experiments on multiple datasets validate SA's superiority over state-of-the-art methods and demonstrate its
+      defense against advanced data reconstruction attacks while preventing model leakage with minimal computation
+      cost on the client side. Code is available at
+      <a href="https://github.com/conditionWang/Split_Adaptation" target="_blank" rel="noopener">github.com/conditionWang/Split_Adaptation</a>.
+    </p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ══ PROBLEM ═══════════════════════════════════════════════════════ -->
+<section class="section" id="problem">
+  <div class="container is-max-desktop">
+    <div class="columns is-centered">
+      <div class="column is-four-fifths">
+    <h2>Adapting pre-trained ViTs without exposing data or model</h2>
+
+    <p>
+      Model adaptation usually follows a two-party setup: a pre-trained model sits on a server, and the labeled
+      task data lives on a client. In non-sensitive domains the client can simply upload its data. But in
+      healthcare, finance, or manufacturing, data is bound up with privacy, intellectual property, and ethical
+      constraints, so sharing it is off the table.
+    </p>
+
+    <p>
+      Sending the model to the client instead runs into two problems: large pre-trained models are valuable IP
+      their owners will not hand over, and adapting a billion-parameter model on the client is computationally
+      prohibitive. Prior privacy-minded options each give something up. <em>Split learning</em> keeps raw data local
+      and splits the model across parties, but it exposes intermediate representations to data-reconstruction
+      attacks and pushes training cost onto the client. <em>Offsite tuning</em> sends a simplified emulator to the
+      client, but that emulator is fully exposed and still demands heavy client-side tuning.
+    </p>
+
+    <p>Split Adaptation is designed to satisfy all three requirements at once:</p>
+
+    <ul class="goals">
+      <li><span class="n">01</span><div><b>Data protection.</b> Nothing the client shares should let the server reconstruct its raw inputs.</div></li>
+      <li><span class="n">02</span><div><b>Model protection.</b> The client should not be able to extract a high-quality copy of the pre-trained ViT, or obtain one cheaply.</div></li>
+      <li><span class="n">03</span><div><b>Few-shot efficacy at low client cost.</b> Strong downstream accuracy from only a handful of labeled examples, with minimal client-side computation.</div></li>
+    </ul>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ══ METHOD ════════════════════════════════════════════════════════ -->
+<section class="section is-tinted" id="method">
+  <div class="container is-max-desktop">
+    <div class="columns is-centered">
+      <div class="column is-four-fifths">
+    <h2>The Split Adaptation pipeline</h2>
+
+    <p>
+      Split Adaptation divides the pre-trained ViT into a <b>frontend</b> and a <b>backend</b> — the paper uses
+      roughly the first two-thirds of the layers as the frontend and the last third as the backend. Only the
+      frontend is sent to the client to extract representations; the backend stays on the server for the final
+      adaptation. Crucially, the frontend is never shared in the clear: it is replaced by a low-bit (8-bit)
+      quantized version, and the client further perturbs it with noise.
+    </p>
+
+    <figure id="fig-2" class="figure-block framework">
+      <img src="figs/SA_fig1.png" width="2250" height="1125" loading="lazy" decoding="async"
+           alt="The Split Adaptation pipeline. On the server: out-of-distribution enhanced quantization produces several INT8 quantized frontends, and out-of-distribution quantization-aware tuning trains the backend with representation mixup. On the client: the received INT8 frontend is made noisy, patches are retrieved and replaced to augment representations, and noise is added again before upload for final adaptation.">
+      <figcaption><b>Figure 2.</b> Overview of Split Adaptation. The server performs out-of-distribution enhanced
+        quantization of the frontend and out-of-distribution quantization-aware tuning of the backend; the client
+        extracts representations through a noisy quantized frontend and augments them by patch retrieval before
+        uploading them (with added noise) for the server's final adaptation.</figcaption>
+    </figure>
+
+    <p>
+      <b>Out-of-distribution enhanced quantization.</b> The frontend is compressed with 8-bit uniform symmetric
+      quantization, choosing per-layer scaling factors with a Hessian-guided metric and layer-wise reconstruction.
+      Because no target-task data is available, the scaling factors are optimized on the server's own data
+      <em>augmented with Hilbert-Transform (HT) out-of-distribution images</em>, which keeps the quantized frontend
+      accurate even when the client's distribution differs sharply from the server's.
+    </p>
+
+    <figure id="fig-3" class="figure-block">
+      <img src="figs/HT_aug.png" width="1262" height="800" loading="lazy" decoding="async"
+           alt="Hilbert-Transform augmentation. A dog image is transformed with the Hilbert transform, then its amplitude is exchanged with the original dog image or with a cat image, producing images that diverge in appearance while keeping the dog semantics.">
+      <figcaption><b>Figure 3.</b> Hilbert-Transform data augmentation. Compared with amplitude-exchange
+        augmentation (bottom row), the HT augmentation (top row) generates data that diverges further from the
+        original in appearance while preserving the original semantics (the dog category).</figcaption>
+    </figure>
+
+    <p>
+      <b>Out-of-distribution quantization-aware tuning.</b> To make the backend tolerate both the quantization gap
+      and the client's noise, the merged server set is split into subsets that yield several distinct quantized
+      frontends. A representation-mixup between the original and quantized features (mixing weight drawn from
+      Beta(0.75, 0.75)) then tunes the backend to generalize across these out-of-distribution frontends without
+      overfitting the server data.
+    </p>
+
+    <p>
+      <b>Bi-level noise for data protection.</b> On the client side, per-layer Gaussian noise is injected into the
+      received frontend, so the exact extracting model is unknown to the server; a smaller Laplace noise is then
+      added to the extracted representations before upload.
+    </p>
+
+    <div class="insight">
+      <p class="insight-n">Insight · two noises beat one</p>
+      <p>
+        The model-level Gaussian noise amplifies the defense of the representation-level noise, so a much smaller
+        Laplace perturbation already defeats reconstruction. The two act synergistically — an effect greater than
+        the sum of the parts (see <a href="#fig-5">Figure&nbsp;5</a>).
+      </p>
+    </div>
+
+    <p>
+      <b>Patch-retrieval augmentation for few-shot adaptation.</b> With only a few labeled examples, adaptation
+      overfits. SA builds a retrieval set for each patch position and, for every augmentation, replaces 50 randomly
+      chosen patches with their most cosine-similar counterparts, repeating this to expand the few-shot set. The
+      server then tunes only the backend's high-level features together with a fresh task head; task-head outputs
+      are sent back to the client so the loss is computed there, keeping the client's labels private too.
+    </p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ══ RESULTS ═══════════════════════════════════════════════════════ -->
+<section class="section" id="results">
+  <div class="container is-max-desktop">
+    <div class="columns is-centered">
+      <div class="column is-four-fifths">
+    <h2>State-of-the-art few-shot adaptation at the lowest client cost</h2>
+
+    <p>
+      On ViT-Large, across CIFAR-100, Places365, and DomainNet-Clipart, SA is the best method in seven of the nine
+      dataset&times;shot settings — winning every 5-shot setting — and is second best in another. Its closest
+      competitor is split learning, which, unlike SA, leaks the client's data (shown in the next section).
+    </p>
+
+    <p class="tbl-caption" id="cap-main">Top-1 accuracy (%) under 3-, 5-, and 10-shot adaptation on ViT-Large across three client
+          datasets (mean over three seeds; &plusmn; standard deviation). Following the paper, the <span class="best">best</span>
+          in each column is shown in blue bold and the <b>second best</b> in bold.</p>
+    <div class="tbl-scroll">
+      <table aria-labelledby="cap-main">
+        <thead>
+          <tr>
+            <th rowspan="2">Method</th>
+            <th colspan="3">3-shot</th>
+            <th colspan="3">5-shot</th>
+            <th colspan="3">10-shot</th>
+          </tr>
+          <tr>
+            <th>CIFAR-100</th><th>Places365</th><th>D.Net-Cl</th>
+            <th>CIFAR-100</th><th>Places365</th><th>D.Net-Cl</th>
+            <th>CIFAR-100</th><th>Places365</th><th>D.Net-Cl</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <th scope="row">Linear Probing</th>
+            <td class="second">74.05<span class="pm">±1.21</span></td><td>26.18<span class="pm">±1.00</span></td><td class="second">57.26<span class="pm">±1.11</span></td>
+            <td>78.79<span class="pm">±0.65</span></td><td class="second">34.25<span class="pm">±1.45</span></td><td>63.84<span class="pm">±0.66</span></td>
+            <td>83.28<span class="pm">±0.33</span></td><td>32.33<span class="pm">±7.82</span></td><td class="second">69.12<span class="pm">±0.75</span></td>
+          </tr>
+          <tr>
+            <th scope="row">Fine Tuning</th>
+            <td>40.32<span class="pm">±5.48</span></td><td>21.64<span class="pm">±0.78</span></td><td>36.95<span class="pm">±6.66</span></td>
+            <td>64.29<span class="pm">±7.69</span></td><td>31.07<span class="pm">±1.04</span></td><td>56.50<span class="pm">±1.87</span></td>
+            <td>81.82<span class="pm">±1.85</span></td><td class="best">39.46<span class="pm">±0.59</span></td><td>70.67<span class="pm">±0.72</span></td>
+          </tr>
+          <tr>
+            <th scope="row">LN-TUNE</th>
+            <td>13.18<span class="pm">±2.17</span></td><td>1.59<span class="pm">±0.53</span></td><td>6.97<span class="pm">±1.96</span></td>
+            <td>34.80<span class="pm">±5.37</span></td><td>3.96<span class="pm">±0.95</span></td><td>13.43<span class="pm">±2.12</span></td>
+            <td>47.97<span class="pm">±6.25</span></td><td>7.71<span class="pm">±1.85</span></td><td>24.53<span class="pm">±2.05</span></td>
+          </tr>
+          <tr>
+            <th scope="row">Split Learning</th>
+            <td class="second">74.05<span class="pm">±1.21</span></td><td class="second">26.84<span class="pm">±1.03</span></td><td class="best">58.14<span class="pm">±0.63</span></td>
+            <td class="second">79.63<span class="pm">±0.53</span></td><td>30.49<span class="pm">±0.36</span></td><td class="second">63.95<span class="pm">±1.18</span></td>
+            <td class="second">83.66<span class="pm">±0.27</span></td><td>35.78<span class="pm">±0.30</span></td><td>65.20<span class="pm">±0.47</span></td>
+          </tr>
+          <tr>
+            <th scope="row">Offsite Tuning</th>
+            <td>42.37<span class="pm">±2.98</span></td><td>24.98<span class="pm">±0.55</span></td><td>40.56<span class="pm">±4.00</span></td>
+            <td>64.83<span class="pm">±6.17</span></td><td>30.45<span class="pm">±0.80</span></td><td>56.43<span class="pm">±0.45</span></td>
+            <td>80.11<span class="pm">±1.07</span></td><td>36.22<span class="pm">±1.33</span></td><td>68.43<span class="pm">±0.64</span></td>
+          </tr>
+          <tr class="sep">
+            <th scope="row">SA (ours)</th>
+            <td class="best">76.24<span class="pm">±0.29</span></td><td class="best">30.92<span class="pm">±0.89</span></td><td>56.26<span class="pm">±0.79</span></td>
+            <td class="best">81.98<span class="pm">±0.49</span></td><td class="best">35.31<span class="pm">±0.01</span></td><td class="best">65.03<span class="pm">±0.59</span></td>
+            <td class="best">85.45<span class="pm">±0.40</span></td><td class="second">39.26<span class="pm">±0.10</span></td><td class="best">71.13<span class="pm">±0.76</span></td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+    <p class="tbl-hint">Scroll the table horizontally to see all nine settings.</p>
+
+    <p>
+      SA reaches this accuracy while doing <em>no training on the client</em> — only representation extraction. The
+      result is by far the lowest client footprint of any method: 2233&nbsp;MB of GPU memory and 2.5&nbsp;minutes,
+      against thousands of MB and tens of minutes for the alternatives.
+    </p>
+
+    <div class="two-col">
+      <div class="two-col-item">
+        <p class="tbl-caption" id="cap-cost">Client GPU memory (MB) and computation time (Min) per method.</p>
+        <div class="tbl-scroll">
+          <table aria-labelledby="cap-cost">
+            <thead><tr><th>Method</th><th>GPU Mem (MB)</th><th>Time (Min)</th></tr></thead>
+            <tbody>
+              <tr><th scope="row">Linear Probing</th><td>6979</td><td>66</td></tr>
+              <tr><th scope="row">Fine Tuning</th><td>10302</td><td>34</td></tr>
+              <tr><th scope="row">LN-TUNE</th><td>5968</td><td>25</td></tr>
+              <tr><th scope="row">Split Learning</th><td>8932</td><td>15</td></tr>
+              <tr><th scope="row">Offsite Tuning</th><td>4896</td><td>23</td></tr>
+              <tr class="sep"><th scope="row">SA (ours)</th><td>2233</td><td>2.5</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      <div class="two-col-item">
+        <p class="tbl-caption" id="cap-abl">Ablation of SA's major components (5-shot accuracy, %).</p>
+        <div class="tbl-scroll">
+          <table aria-labelledby="cap-abl">
+            <thead><tr><th>Variation</th><th>CIFAR-100</th><th>Places365</th><th>D.Net-Cl</th></tr></thead>
+            <tbody>
+              <tr><th scope="row">w/o HT Aug</th><td>80.37</td><td>35.27</td><td>64.59</td></tr>
+              <tr><th scope="row">w/o OOD QAT</th><td>79.03</td><td>29.50</td><td>64.42</td></tr>
+              <tr><th scope="row">w/o QAT</th><td>80.05</td><td>29.59</td><td>64.16</td></tr>
+              <tr><th scope="row">w/o PR Aug</th><td>79.90</td><td>29.56</td><td>52.85</td></tr>
+              <tr class="sep"><th scope="row">SA (ours)</th><td>81.98</td><td>35.31</td><td>71.13</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+
+    <p>
+      Every component earns its place: dropping patch-retrieval augmentation costs the most on DomainNet-Clipart
+      (71.13&nbsp;&rarr;&nbsp;52.85), while removing the out-of-distribution quantization-aware tuning cuts
+      Places365 by roughly six points (35.31&nbsp;&rarr;&nbsp;29.50).
+    </p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ══ PROTECTION ════════════════════════════════════════════════════ -->
+<section class="section is-tinted" id="protection">
+  <div class="container is-max-desktop">
+    <div class="columns is-centered">
+      <div class="column is-four-fifths">
+    <h2>Protecting the model and the data</h2>
+
+    <p>
+      <b>The model stays protected.</b> We test the three most plausible ways an adversary could try to build a
+      high-quality model from what SA exposes: tune a head on the quantized frontend, on the (hypothetically
+      revealed) original frontend, or on the quantized frontend with an auxiliary backend. All three land far below
+      SA — and even below linear probing — so the quantized frontend does not hand over a usable model.
+    </p>
+
+    <p class="tbl-caption" id="cap-prot">Accuracy (%) of the three most plausible model-extraction attempts, versus full SA, on ViT-Large.</p>
+    <div class="tbl-scroll">
+      <table aria-labelledby="cap-prot">
+        <thead><tr><th>Extraction attempt</th><th>CIFAR-100</th><th>Places365</th><th>D.Net-Cl</th></tr></thead>
+        <tbody>
+          <tr><th scope="row">Quant. Frontend</th><td>26.34</td><td>13.45</td><td>26.70</td></tr>
+          <tr><th scope="row">Original Frontend</th><td>26.53</td><td>13.72</td><td>27.12</td></tr>
+          <tr><th scope="row">Auxiliary Backend</th><td>30.65</td><td>10.15</td><td>16.56</td></tr>
+          <tr class="sep"><th scope="row">SA (ours)</th><td>81.98</td><td>35.31</td><td>71.13</td></tr>
+        </tbody>
+      </table>
+    </div>
+
+    <p>
+      <b>The data stays protected.</b> We extend the state-of-the-art reconstruction attack FORA to ViTs and run it
+      against SA and split learning (the only baseline that also shares representations). SA drives every
+      reconstruction well below split learning's on all three datasets.
+    </p>
+
+    <figure id="fig-4" class="recon">
+      <div class="recon-grid recon-3col">
+        <div class="recon-corner"></div>
+        <div class="recon-colhead">CIFAR-100</div>
+        <div class="recon-colhead">Places365</div>
+        <div class="recon-colhead">D.Net-Cl</div>
+
+        <div class="recon-rowlab">Ground&nbsp;Truth</div>
+        <div class="recon-cell"><img src="figs/cifar-gt.png" width="680" height="224" loading="lazy" decoding="async" alt="CIFAR-100 ground-truth images"></div>
+        <div class="recon-cell"><img src="figs/place-gt.png" width="680" height="224" loading="lazy" decoding="async" alt="Places365 ground-truth images"></div>
+        <div class="recon-cell"><img src="figs/dc-gt.png" width="680" height="224" loading="lazy" decoding="async" alt="DomainNet-Clipart ground-truth images"></div>
+
+        <div class="recon-rowlab">Split&nbsp;Learning</div>
+        <div class="recon-cell"><img src="figs/cifar-recon.png" width="680" height="224" loading="lazy" decoding="async" alt="FORA reconstruction of CIFAR-100 under split learning — recognizable"><span class="recon-m">S 0.80 · P 26.1 · L 0.46</span></div>
+        <div class="recon-cell"><img src="figs/place-recon.png" width="680" height="224" loading="lazy" decoding="async" alt="FORA reconstruction of Places365 under split learning"><span class="recon-m">S 0.43 · P 20.8 · L 0.67</span></div>
+        <div class="recon-cell"><img src="figs/dc-recon.png" width="680" height="224" loading="lazy" decoding="async" alt="FORA reconstruction of DomainNet-Clipart under split learning"><span class="recon-m">S 0.59 · P 22.1 · L 0.46</span></div>
+
+        <div class="recon-rowlab">SA&nbsp;(ours)</div>
+        <div class="recon-cell"><img src="figs/cifar-noise.png" width="680" height="228" loading="lazy" decoding="async" alt="FORA reconstruction of CIFAR-100 under SA — heavily degraded"><span class="recon-m strong">S 0.23 · P 15.2 · L 0.70</span></div>
+        <div class="recon-cell"><img src="figs/place-noise.png" width="680" height="228" loading="lazy" decoding="async" alt="FORA reconstruction of Places365 under SA — heavily degraded"><span class="recon-m strong">S 0.30 · P 16.6 · L 0.73</span></div>
+        <div class="recon-cell"><img src="figs/dc-noise.png" width="680" height="228" loading="lazy" decoding="async" alt="FORA reconstruction of DomainNet-Clipart under SA — heavily degraded"><span class="recon-m strong">S 0.25 · P 14.4 · L 0.60</span></div>
+      </div>
+    </figure>
+    <p class="fig-caption"><b>Figure 4.</b> Defense against the FORA reconstruction attack, SA versus split learning.
+      Quality is measured by SSIM (S&darr;), PSNR (P&darr;), and LPIPS (L&uparrow;): lower SSIM/PSNR and higher LPIPS
+      mean a worse reconstruction, i.e. stronger protection. SA is better on every dataset and every metric.</p>
+
+    <p>
+      Both noise levels matter. Removing either the model-level Gaussian noise or the representation-level Laplace
+      noise weakens protection; together they are more than the sum of their parts.
+    </p>
+
+    <figure id="fig-5" class="recon recon-single">
+      <div class="recon-grid recon-1col">
+        <div class="recon-rowlab">Ground&nbsp;Truth</div>
+        <div class="recon-cell"><img src="figs/cifar-gt.png" width="680" height="224" loading="lazy" decoding="async" alt="CIFAR-100 ground truth"></div>
+
+        <div class="recon-rowlab">SA w/o Laplace Noise</div>
+        <div class="recon-cell"><img src="figs/model-noise-noise.png" width="680" height="228" loading="lazy" decoding="async" alt="Reconstruction with model noise only"><span class="recon-m">S 0.76 · P 23.1 · L 0.49</span></div>
+
+        <div class="recon-rowlab">SA w/o Model Noise</div>
+        <div class="recon-cell"><img src="figs/rep-noise-noise.png" width="680" height="228" loading="lazy" decoding="async" alt="Reconstruction with representation noise only"><span class="recon-m">S 0.28 · P 16.4 · L 0.67</span></div>
+
+        <div class="recon-rowlab">SA&nbsp;(ours)</div>
+        <div class="recon-cell"><img src="figs/cifar-noise.png" width="680" height="228" loading="lazy" decoding="async" alt="Reconstruction with full bi-level noise — heavily degraded"><span class="recon-m strong">S 0.23 · P 15.2 · L 0.70</span></div>
+      </div>
+    </figure>
+    <p class="fig-caption"><b>Figure 5.</b> Ablation of SA's bi-level noise against FORA on CIFAR-100. Dropping either
+      noise level yields a sharper reconstruction (higher SSIM/PSNR, lower LPIPS); the full bi-level noise gives the
+      strongest protection.</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ══ TAKEAWAY ══════════════════════════════════════════════════════ -->
+<section class="section" id="takeaway">
+  <div class="container is-max-desktop">
+    <div class="columns is-centered">
+      <div class="column is-four-fifths">
+    <h2>Adapt from a few shots — without trading away data or model</h2>
+    <p>
+      Split Adaptation shows that a pre-trained ViT can be adapted to a new task, from only a handful of labeled
+      examples, without the client ever seeing the real model and without the server ever seeing the real data. A
+      quantized, noise-perturbed frontend protects the model's parameters; bi-level noise and patch-retrieval
+      augmentation protect the client's data and labels while keeping accuracy high; and the whole procedure runs at
+      a fraction of the client compute of prior methods. Across CIFAR-100, Places365, and DomainNet-Clipart it
+      matches or beats strong adaptation baselines while, unlike them, leaking neither the model nor the data.
+    </p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ══ CITE ══════════════════════════════════════════════════════════ -->
+<section class="section is-tinted" id="cite">
+  <div class="container is-max-desktop">
+    <div class="columns is-centered">
+      <div class="column is-four-fifths">
+    <h2>BibTeX</h2>
+    <div class="bib">
+      <button class="copy" id="copy" type="button">Copy</button>
+      <pre id="bib">@inproceedings{wang2025split,
+  title     = {Split Adaptation for Pre-trained Vision Transformers},
+  author    = {Wang, Lixu and Shang, Bingqi and Li, Yi and Mohapatra, Payal
+               and Dong, Wei and Wang, Xiao and Zhu, Qi},
+  booktitle = {Proceedings of the IEEE/CVF Conference on Computer Vision
+               and Pattern Recognition (CVPR)},
+  year      = {2025}
+}</pre>
+    </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+</main>
+
+<footer>
+  <div class="container is-max-desktop">
+    <p>
+      Project page for a paper at CVPR 2025. All figures are reproduced from the paper; all numbers are the values
+      reported there.
+    </p>
+    <p>
+      This page was built using the
+      <a href="https://github.com/eliahuhorwitz/Academic-project-page-template" target="_blank" rel="noopener">Academic Project Page Template</a>,
+      which was adopted from the <a href="https://nerfies.github.io" target="_blank" rel="noopener">Nerfies</a> project page.
+      This website is licensed under a
+      <a href="http://creativecommons.org/licenses/by-sa/4.0/" target="_blank" rel="license noopener">Creative Commons Attribution-ShareAlike 4.0 International License</a>.
+    </p>
+  </div>
+</footer>
+
+<button class="scroll-to-top" type="button" aria-label="Back to top">
+  <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><path d="M3 10l5-5 5 5"/></svg>
+</button>
+
+<script src="static/js/page.js"></script>
+</body>
+</html>

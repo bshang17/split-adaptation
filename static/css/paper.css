@@ -1,0 +1,758 @@
+/* ══════════════════════════════════════════════════════════════════════
+   Forgetting to Forget — project page
+   Load order: bulma.min.css → paper.css
+
+   Every value here is taken from one of the reference pages the author
+   supplied, not invented:
+     A  locuslab.github.io/safety-pretraining          (REF-locuslab.css)
+     B  chongyu-fan.netlify.app/posts/pion             (REF-pion-inline.css)
+     C  Horwitz Academic-project-page-template         (index.css)
+   Rule of thumb used throughout: C owns page chrome (tokens, buttons,
+   header), B owns content typography (figures, tables, callouts, captions),
+   A owns the frosted nav bar and the footer scale. Where two references
+   disagree the domain owner wins and the loser is named inline.
+
+   ── DELIBERATE DECISIONS, PRESERVED ON PURPOSE ──────────────────────────
+   1. The h1 — and ONLY the h1 — breaks out of the content column so the
+      79-character headline lands on two lines. Author's explicit
+      instruction. Technique is B's (.fig-breakout uses the identical
+      left:50% / translateX(-50%) re-centring); the scope is ours.
+   2. Tables use a NEUTRAL GREY row tint (--background-accent) for our own
+      rows and no per-cell emphasis, because the paper's only in-table
+      emphasis device is \rowcolor{gray!20}. B's blue tint and B's
+      `tbody td strong{color:accent}` are deliberately NOT adopted.
+   3. NO DARK BANDS anywhere. Every surface is white, #f8fafc or #f1f5f9.
+      A's five coloured section bands and any inverted header/footer are
+      deliberately not adopted.
+
+   ── CROSS-CUTTING FIX none of the domain audits caught ──────────────────
+   `.abstract,.section p,.goals li{font-size:1.1rem;line-height:1.8}` has
+   specificity (0,1,1). Every caption class — .fig-caption, .tbl-caption,
+   .tbl-hint — and .insight-n are (0,1,0) on a <p>, so the prose rule was
+   silently beating all of them and the captions were rendering at 1.1rem/1.8
+   instead of .88rem/1.55. Fixed by qualifying those selectors with `p.`
+   (or `.insight p.insight-n`) so they reach (0,1,1)+ and win. Same reason
+   .insight's type is set on `.insight p` and not only on the container as
+   B does: B has no competing `.section p` rule, this page does.
+   ══════════════════════════════════════════════════════════════════════ */
+
+/* ── 0. TOKENS — Reference C's :root, verbatim ───────────────────────── */
+:root{
+  --primary-color:#2563eb;      /* C --primary-color; A #3b5bfe and B #4485C7
+                                   both differ — C wins, this is page chrome */
+  --primary-hover:#1d4ed8;      /* C */
+  --text-primary:#1e293b;       /* C */
+  --text-secondary:#64748b;     /* C; == B --proj-muted #64748b */
+  --text-light:#94a3b8;         /* C; == B --proj-faint #94a3b8 */
+  --background-primary:#ffffff;
+  --background-secondary:#f8fafc;
+  --background-accent:#f1f5f9;
+  --background-soft:#fafbfd;    /* B --proj-bg-softer; was hard-coded in .eq */
+  --border-color:#e2e8f0;
+
+  --shadow-sm:0 1px 2px 0 rgb(0 0 0 / .05);
+  --shadow-md:0 4px 6px -1px rgb(0 0 0 / .1), 0 2px 4px -2px rgb(0 0 0 / .1);
+  --shadow-lg:0 10px 15px -3px rgb(0 0 0 / .1), 0 4px 6px -4px rgb(0 0 0 / .1);
+
+  --gradient-accent:linear-gradient(135deg,#f093fb 0%,#f5576c 100%); /* C */
+  --title-width:1000px;         /* no reference; serves decision 1 above */
+  --border-radius:12px;
+  --transition:all .3s cubic-bezier(.4,0,.2,1);
+
+  /* Math face for .eq only. B uses this stack for its rendered math glyphs
+     (.sigma-label, .out-input); prose stays in --sans. */
+  --math:'Latin Modern Math','Cambria Math',serif;
+  --sans:'Inter','Segoe UI',-apple-system,BlinkMacSystemFont,sans-serif;
+  --mono:'SF Mono','Monaco','Cascadia Code','Roboto Mono',monospace;
+}
+
+*{box-sizing:border-box}
+/* Header measures 66.6px (bar 12+12 pad, nav a 25.6px line-box + 8+8 pad,
+   +1px border). 4.5rem left 5.4px clearance — an anchored h2 landed flush
+   against the bar. B budgets 24px (.project-content h2{scroll-margin-top:24px}),
+   so 66.6+24 ≈ 90.6px → 5.5rem. */
+html{-webkit-text-size-adjust:100%;scroll-behavior:smooth;scroll-padding-top:5.5rem}
+body{
+  margin:0;
+  background:var(--background-primary);
+  color:var(--text-primary);
+  font-family:var(--sans);
+  font-size:16px;line-height:1.6;                 /* C body */
+  -webkit-font-smoothing:antialiased;
+}
+img{max-width:100%;height:auto;display:block}
+a{color:var(--primary-color);text-decoration:none;transition:var(--transition)}
+a:hover{color:var(--primary-hover);text-decoration:underline}
+:focus-visible{outline:2px solid var(--primary-color);outline-offset:2px}
+
+/* ── 1. WIDTH & SECTION RHYTHM ────────────────────────────────────────
+   The template's own chain produces the measure; nothing is hand-set.
+   960 container → columns −.75rem → .is-four-fifths 80% → −.75rem = 763.2px
+   (B's .project-content is 740px, A's .hero-center 900px — we sit between).
+   The side gutter is kept: removing it is what made the page touch the
+   viewport edge on phones.                                              */
+.column.is-four-fifths > *{max-width:100%}
+/* Reproduces the margin-collapse B gets for free from a single content
+   flow. Margins never collapse across section padding, so without this the
+   section's last <p> adds a dead 24px on top of the padding. */
+.column.is-four-fifths > *:last-child{margin-bottom:0}
+
+/* was 3rem: 24 (trailing p) + 48 + 48 = 120px between body text and the
+   next h2. B has no section padding at all — its whole inter-section gap is
+   .project-content h2{margin:2.4em 0 .7em} = 65.28px. A's section{padding:72px 0}
+   = 144px, but A pays for it with five coloured bands, which decision 3
+   rules out here. 36+36 = 72px. */
+.section{padding:2.25rem 1.5rem}
+/* Top from C .publication-header .hero-body{padding:6rem 1.5rem 4rem};
+   bottom tightened to 48px so hero→Abstract is 84px, not 112px. */
+.hero .hero-body{padding:4rem 1.5rem 3rem}
+@media(max-width:768px){
+  .section{padding:1.75rem 1rem}   /* A mobile section{padding:56px 0} */
+  .hero .hero-body{padding:2rem 1rem}
+}
+
+/* ── 2. SECTION BANDS — Reference C's is-light. Decision 3: light only. ── */
+.hero,.section{background:var(--background-primary);animation:none}
+.section.is-tinted{
+  background:var(--background-secondary);
+  border-top:1px solid var(--border-color);
+  border-bottom:1px solid var(--border-color);
+}
+
+/* ── 3. TYPE ─────────────────────────────────────────────────────────── */
+h1{
+  font-family:var(--sans);
+  font-size:3rem;            /* A .hero-title h1 */
+  font-weight:800;           /* C .publication-title */
+  line-height:1.1;           /* C .publication-title */
+  letter-spacing:-.012em;    /* B .project-title */
+  margin:0 0 2rem;text-align:center;
+  color:var(--text-primary);overflow-wrap:break-word;
+}
+@media(max-width:768px){h1{font-size:2.5rem;line-height:1.2;margin-bottom:1.5rem}}
+@media(max-width:480px){h1{font-size:2rem}}
+/* No reference tints a word inside a title (A's h1 has no <em>, B's title is
+   one ink). Kept as a deliberate one-word device. */
+h1 em{font-style:normal;color:var(--primary-color)}
+
+/* DELIBERATE DECISION 1 — the title, and ONLY the title, breaks out of the
+   content column so the 79-character headline lands on two lines. Requested
+   explicitly by the author. The mechanism is B's own break-out technique
+   (.fig-grid.fig-breakout{max-width:1080px;position:relative;left:50%;
+   transform:translateX(-50%)}); we scope it to h1 instead of to figure rows,
+   leaving every other element on the 763.2px measure. */
+.hero .column.is-four-fifths > h1{
+  max-width:none;width:min(var(--title-width),calc(100vw - 3rem));
+  position:relative;left:50%;transform:translateX(-50%);
+}
+@media(max-width:1024px){
+  .hero .column.is-four-fifths > h1{width:auto;left:auto;transform:none}
+}
+
+/* h2 left-aligned (A and B). Separation device is B's FULL-WIDTH hairline
+   (.project-content h2{padding-bottom:.35em;border-bottom:1px solid}) —
+   that is what was missing when section starts read as weak. C's 60px accent
+   bar is kept, straddling the hairline at bottom:-2px, so no colour decision
+   is lost. Spacing: was 1rem pad + 2rem margin = 48px of dead air; B's is
+   9.52 + 19.04 = 28.6px, so 8 + 20 = 28px here. */
+h2{
+  font-family:var(--sans);
+  font-size:2rem;                     /* bulma .title.is-3, which C styles */
+  font-weight:700;line-height:1.2;
+  letter-spacing:-.005em;             /* B .project-content h2 */
+  color:var(--text-primary);text-align:left;
+  margin:0 0 1.25rem;padding-bottom:.5rem;
+  border-bottom:1px solid var(--border-color);
+  position:relative;overflow-wrap:break-word;
+}
+h2::after{
+  content:'';position:absolute;bottom:-2px;left:0;
+  width:60px;height:3px;background:var(--gradient-accent);border-radius:2px;
+}
+@media(max-width:768px){h2{font-size:1.6rem}}
+
+/* h3 / .eql-cntrb rules deleted: the document has zero <h3> and never uses
+   .eql-cntrb. See the markup notes if either is added back. */
+
+p{margin:0 0 1.5rem;overflow-wrap:break-word}
+.abstract,.section p,.goals li{font-size:1.1rem;line-height:1.8;text-align:left} /* C .content.has-text-justified */
+b,strong{font-weight:700;color:var(--text-primary)}
+em{font-style:italic}
+
+code{
+  font-family:var(--mono);font-size:.9em;      /* B .project-content code */
+  background:var(--background-accent);
+  padding:.12em .34em;border-radius:3px;color:var(--text-primary);
+}
+
+/* ── 4. HEADER — Reference A's frosted bar ───────────────────────────── */
+header{
+  position:sticky;top:0;z-index:100;
+  background:rgba(255,255,255,.85);            /* A .nav */
+  backdrop-filter:blur(12px);-webkit-backdrop-filter:blur(12px);
+  border-bottom:1px solid var(--border-color);
+}
+/* A's nav bar is deliberately WIDER than its content column:
+   .container{max-width:1100px} for the nav vs .hero-center{max-width:900px}
+   for the body. Same relationship here — 1100px bar over the 763px column. */
+header > .container{max-width:1100px!important;width:min(100% - 2.5rem,1100px)}
+header .bar{
+  display:flex;align-items:center;justify-content:space-between;
+  gap:1rem;padding:12px 1.25rem;                 /* A nav .container */
+}
+.brand{font-weight:700;font-size:16px;color:var(--text-primary)}
+nav{display:flex;gap:6px;flex-wrap:wrap}
+nav a{font-size:16px;font-weight:600;color:#374151;   /* A .nav-links a */
+      padding:8px 10px;border-radius:8px;text-decoration:none}
+nav a:hover{background:var(--background-accent);color:var(--text-primary);
+            text-decoration:none}
+@media(max-width:768px){header{display:none}}
+
+/* ── 5. HERO ─────────────────────────────────────────────────────────── */
+/* was 1.25rem for both, which no reference declares anywhere.
+   A #authors{font-size:1.15rem;line-height:1.7;letter-spacing:.1px}
+   B .project-affiliations{font-size:.92rem;color:--proj-muted;line-height:1.65}
+   — the affiliation line is meant to be SMALLER and quieter than the authors. */
+.authors{
+  font-size:1.15rem;font-weight:500;line-height:1.7;letter-spacing:.1px;
+  color:var(--text-primary);margin:0 0 .5rem;
+}
+.authors a{color:var(--primary-color);font-weight:600}
+.affil{
+  font-size:.92rem;font-weight:400;line-height:1.65;
+  color:var(--text-secondary);margin:0 0 1.5rem;
+}
+.placeholder{        /* no reference analogue; every colour resolves to a token */
+  background:var(--background-accent);
+  border-bottom:1.5px dashed var(--text-light);
+  padding:.05em .3em;border-radius:2px;
+  color:var(--text-secondary);font-weight:500;
+}
+
+/* TL;DR — CONFLICT RESOLVED: the spacing audit kept 1.05rem/1.7 and fixed
+   only the box; the token audit showed 1.05rem exists in no reference.
+   Both are honoured: B .tldr{padding:18px 22px;margin:1.6em 0 2em} for the
+   box, B .callout{font-size:.98rem;line-height:1.65} for the type.
+   `auto` kept on the horizontal margin — this layout needs the centring. */
+.tldr{
+  text-align:left;font-size:.98rem;line-height:1.65;color:var(--text-primary);
+  background:var(--background-secondary);
+  border:1px solid var(--border-color);
+  border-left:4px solid var(--primary-color);
+  border-radius:var(--border-radius);
+  padding:18px 22px;margin:1.6em auto 2em;
+}
+
+/* Buttons — Reference C (it explicitly overrides Bulma's is-rounded to 12px).
+   B .project-links{gap:10px;margin:22px 0 6px} for the row. */
+.btns{display:flex;gap:.5rem;flex-wrap:wrap;justify-content:center;margin-top:22px}
+.btn{
+  display:inline-flex;align-items:center;gap:.5rem;
+  font-family:var(--sans);font-size:1rem;font-weight:600;line-height:1;
+  padding:.75rem 1.25rem;border-radius:var(--border-radius);
+  background:var(--text-primary);color:#fff;border:none;   /* C .button.is-dark */
+  box-shadow:var(--shadow-md);text-decoration:none;transition:var(--transition);
+}
+.btn:hover{background:var(--primary-color);color:#fff;text-decoration:none;
+           transform:translateY(-2px);box-shadow:var(--shadow-lg)}
+.btn:active{transform:translateY(0);box-shadow:var(--shadow-md)}
+.btn.ghost{background:var(--background-accent);color:var(--text-primary);
+           border:1px solid var(--border-color);box-shadow:none}
+.btn.ghost:hover{background:var(--primary-color);color:#fff;
+                 border-color:var(--primary-color)}
+.btn svg{width:16px;height:16px;flex:none}
+/* C: @media(max-width:768px){.button{font-size:.875rem;padding:.75rem 1rem}}
+   — this step was missing; only the <=480 full-width block existed. */
+@media(max-width:768px){.btn{font-size:.875rem;padding:.75rem 1rem}}
+@media(max-width:480px){
+  .btns{display:block}
+  .btn{width:100%;margin-bottom:.5rem;justify-content:center}
+}
+
+/* ── 6. ABSTRACT — plain prose; every reference renders it unboxed ────── */
+.abstract{background:none;border:0;border-radius:0;padding:0;margin:0;
+          color:var(--text-primary)}
+
+/* ── 7. FIGURES ──────────────────────────────────────────────────────────
+   B sizes every figure image on BOTH axes:
+     .fig-grid figure img{max-width:100%;max-height:220px;width:auto;height:auto;
+                          object-fit:contain}
+     .fig-grid.equal-height figure img{height:320px;max-height:320px;width:auto}
+   Sizing by width alone is what made the near-square figures render ~2x
+   taller than the wide ones off one identical rule: on a 361.6px panel column
+   a 2.03:1 panel is 178.0px tall but a 0.96:1 panel is 376.3px.
+   B never applies .fig-breakout to a standalone <figure> or to a 2-panel row,
+   so no break-out rule is added here — break-out stays scoped to h1
+   (decision 1). Breaking fig-1 out to 1080px would take it from 345.7px to
+   489.2px tall, i.e. straight into the complaint.                        */
+
+.figure-block{margin:1.4em auto;text-align:center}
+/* the 4-panel teaser is 2.2:1 — capping it by height alone would leave it
+   full-column-wide; cap the width too. */
+.figure-block.teaser img{max-width:640px;max-height:none}   /* B .project-content figure */
+/* C's in-body image treatment (shadow, no border), but in B's max-width form
+   (.project-content img{max-width:100%;height:auto;display:block;margin:14px auto})
+   rather than width:100%. A forced 100% stretch makes ANY max-height
+   structurally unreachable — that is why no height cap could be attached to
+   this class before. 70vh guard is C index.css .publication-banner{max-height:70vh}.
+   Non-binding for fig-1: 2000x906 clamps to the 763.2px column = 345.7px. */
+.figure-block img{
+  max-width:100%;width:auto;height:auto;max-height:300px;
+  margin-inline:auto;
+  border:none;padding:0;background:none;
+  border-radius:var(--border-radius);box-shadow:var(--shadow-md);
+}
+/* fig-5 is 1125x1087, i.e. near-square, so HEIGHT is the binding axis:
+   440px of width buys 425.1px of height — 23% taller than the 4-panel teaser,
+   for the page's least important figure. B's 320px cap lands it at
+   331.2 x 320px. max-width:440px is kept as the ceiling for a future wide plot. */
+.figure-block.plot img{max-width:330px;max-height:260px}
+
+/* Multi-panel row — B: ONE outer frame, borderless panels inside.
+   Two adjacent frames read as two separate figures.
+   gap / padding are B .fig-grid verbatim; the top margin had drifted from
+   B's 1.4em to 2rem. */
+.fig2{
+  display:grid;grid-template-columns:repeat(2,minmax(0,1fr));
+  gap:10px 12px;align-items:end;justify-items:center;
+  margin:1.4em auto .3em;padding:12px 14px 10px;
+  background:#fff;border:1px solid var(--border-color);border-radius:8px;
+  box-shadow:0 1px 3px rgba(15,23,42,.04);
+}
+/* B .fig-grid figure. Without width/height 100% the figure is fit-content, so
+   the child's max-width:100% resolves against an indeterminate box; without
+   the flex column, align-items:end on the grid has nothing to bottom-align,
+   so once max-height starts shrinking one panel more than the other the
+   captions drift out of line. */
+.fig2 figure{
+  margin:0;display:flex;flex-direction:column;
+  align-items:center;justify-content:flex-end;
+  width:100%;height:100%;
+}
+/* max-height:320px is THE fix. fig-2 (953x469) unchanged at 178.0px, the cap
+   is not binding. fig-3 (1034x1076) 376.3 → 320px (307.5px wide). fig-4
+   (1058x1010) 345.2 → 320px (335.2px wide). Also fixes the stacked case:
+   below 680px the row collapses to one column and fig-3 rendered 505.3px tall.
+   320px is B's .equal-height value, NOT its general 220px: 220px is B's cap
+   for dense 3-4 panel rows and would shrink fig-3 to 211.4px inside a
+   361.6px column — 42% whitespace and an unreadable heatmap.
+   CONFLICT RESOLVED: the 8px caption gap lives on the image's margin-bottom
+   (B .fig-grid figure img{margin:0 auto 8px}), not on the caption's
+   margin-top — the caption audit proposed the latter; inside a flex column
+   the two are visually identical, so B's own placement wins. */
+.fig2 img{
+  max-width:100%;max-height:200px;width:auto;height:auto;object-fit:contain;
+  margin:0 auto 8px;
+  border:none;border-radius:0;box-shadow:none;background:none;
+}
+/* B .fig-grid figcaption verbatim, including white-space:nowrap +
+   overflow:visible — a wrapped panel label breaks the shared caption baseline,
+   and spilling is preferable to clipping. Both panel labels measure ~220px at
+   .8rem, well inside the 361.6px column and inside the ~388px mobile column. */
+.fig2 figcaption{
+  font-size:.8rem;font-style:normal;color:var(--text-primary);
+  text-align:center;margin:0;border:0;padding:0;
+  white-space:nowrap;overflow:visible;
+}
+@media(max-width:680px){.fig2{grid-template-columns:1fr}}
+
+/* ── FIGURE / TABLE CAPTIONS — Reference B ───────────────────────────────
+   B's caption colour --proj-muted #64748b is identical to --text-secondary.
+   Contrast on #ffffff = 4.76:1 and on the #fafbfd equation card = 4.60:1,
+   both passing WCAG AA for normal text. No colour change is warranted.
+   NOTE the `p.` qualifiers: .fig-caption / .tbl-caption / .tbl-hint are all
+   used on <p> inside .section, and .section p is (0,1,1). Unqualified these
+   captions lost every declaration to the prose rule and rendered at
+   1.1rem/1.8. See the cross-cutting fix note in the file header.        */
+figcaption,p.fig-caption{
+  text-align:center;font-size:.88rem;line-height:1.55;
+  color:var(--text-primary);max-width:96%;margin:10px auto 0;
+  border-left:0;padding-left:0;
+}
+/* Deliberate deviation from B, which has no b/strong rule and lets its
+   "Figure N." label inherit the muted italic. The darker upright label
+   anchors the caption — this is MORE contrast than B, not less. */
+figcaption b,figcaption strong,p.fig-caption b,p.fig-caption strong{
+  color:var(--text-primary);font-weight:700;font-style:normal;
+}
+/* B's .fig-caption margin (10px auto 0) assumes the caption sits INSIDE
+   <figure>, whose 1.4em bottom margin supplies the gap. Here .fig-caption is
+   a standalone <p> sibling of .fig2 and the next <p> has margin-top:0, so
+   body text butted straight onto the caption with 0px between. Restore B's
+   figure bottom margin on the element that actually terminates the figure.
+   Scoped with p. so captions inside <figure class="figure-block"> are
+   untouched. */
+p.fig-caption{margin-bottom:1.4em}
+
+/* ── 8. CALLOUTS / LISTS / EQUATIONS ─────────────────────────────────── */
+
+/* Insight — B .callout: a rail, not a box. Geometry was already B verbatim;
+   the type declarations B carries were missing.
+   B sets colour/size/leading on the CONTAINER only. That form does not work
+   here: .section p (0,1,1) targets the child <p> directly and beats
+   inheritance, so the size is restated on .insight p. */
+.insight{
+  position:relative;
+  background:none;border:0;border-radius:0;
+  border-left:2px solid var(--primary-color);
+  padding:4px 0 4px 18px;margin:1.6em 0;
+  color:var(--text-primary);
+  font-size:.98rem;line-height:1.65;
+}
+.insight p{margin:0;font-size:.98rem;line-height:1.65}
+/* B .callout p + p. Without it the eyebrow label collides with the body text:
+   .insight p (0,1,1) zeroes any margin .insight-n sets on itself. */
+.insight p + p{margin-top:.5em}
+
+/* Eyebrow label — B's only primary-coloured uppercase label is .tldr h2:
+   .78rem / 700 / uppercase / --proj-primary, tracked at 0.14em (was .08em,
+   which B uses only at lighter weights on .axes-anim-title .badge).
+   Needs (0,2,1) to clear both .section p and .insight p. */
+.insight p.insight-n{
+  font-family:var(--sans);
+  font-size:.78rem;font-weight:700;letter-spacing:.14em;text-transform:uppercase;
+  color:var(--primary-color);margin:0;
+}
+
+/* Goals — CONFLICT RESOLVED. The token audit wanted the marker at 1.1rem in
+   --primary-color ("a marker should not be smaller than the line it labels").
+   The callout audit is followed instead: B NEVER accent-colours a list
+   marker, and its one numbered list (.algo-block ol.algo-steps) renders the
+   counter deliberately recessive — faint grey, monospace, .74rem,
+   right-aligned in a 26px gutter with a 14px gap, baseline-aligned via flex.
+   Blue is the link colour on this page; a blue "01" reads as clickable.
+   The 26+14=40px gutter also reproduces the old 2.4rem (38.4px) indent, so
+   the text block does not move.
+   Item spacing 1rem → .4em: B .project-content li and B .tldr li both use
+   0.4em. List bottom margin from B .project-content > ul{margin:0 0 1.05em};
+   the top margin stays 1.5rem because it collapses with the preceding p. */
+.goals{list-style:none;padding:0;margin:1.5rem 0 1.05em;background:none;border:0}
+.goals li{
+  display:flex;align-items:baseline;
+  background:none;padding:0;margin:0 0 .4em;
+}
+.goals .n{
+  width:26px;flex-shrink:0;text-align:right;margin-right:14px;
+  font-family:var(--mono);font-size:.74rem;font-weight:400;
+  color:var(--text-light);
+}
+.goals li > div{flex:1;min-width:0}
+.goals b{font-weight:700;color:var(--text-primary)}
+
+/* Equations — B has NO equation container at all: its display math is bare
+   (mjx-container[display="true"]{margin:1em 0}) with
+   mjx-container{overflow-x:auto;max-width:100%}. The soft card this page
+   wants is actually B's .tldr, so .tldr's real numbers are used:
+   padding 18px 22px, margin 1.6em 0 2em, --proj-bg-softer #fafbfd.
+   CONFLICT RESOLVED — font: the token audit said var(--sans)/1.02rem/1.75;
+   the callout audit said B's math face and 1.65 leading. Split by evidence:
+     • family → the math audit wins. This block is pure math glyphs
+       (ℓ 𝔼 𝒟 𝒮 Σ ‖ θ λ) and B renders math glyphs in 'Latin Modern Math'
+       (.sigma-label, .out-input), never in Inter. .eq-note is pinned back to
+       --sans below so the prose annotations stay in Inter.
+     • size → 1.02rem. Both audits agree 1.03rem is invented; 1.02rem is B's
+       real content measure (.project-content{font-size:1.02rem}).
+     • leading → 1.65 (B .callout / .project-wrap). 1.75 has no counterpart. */
+.eq{
+  background:var(--background-soft);
+  border:1px solid var(--border-color);
+  border-radius:10px;
+  padding:18px 22px;
+  margin:1.6em 0 2em;
+  overflow-x:auto;max-width:100%;
+  font-family:var(--math);
+  font-variant-numeric:tabular-nums;               /* B .algo-block */
+  font-size:1.02rem;line-height:1.65;text-align:center;
+}
+.eq i{font-style:italic}
+.eq-line{display:block;white-space:nowrap}
+/* The two .eq blocks at index.html:332-338 are ONE equation in two halves.
+   The spacing audit proposed `.eq + .eq{margin-top:.5em}` alone — that does
+   NOT work: adjacent block margins collapse to max(2em,.5em)=2em, so the
+   pair still reads as two separate blocks. Both sides must be reduced, which
+   needs :has to select "an .eq that is followed by an .eq". Collapsed result
+   is max(.5em,.5em)=8px. Pattern is B .callout p + p{margin-top:.5em}.
+   Browsers without :has degrade to the current 2em gap — no breakage. */
+.eq:has(+ .eq){margin-bottom:.5em}
+.eq + .eq{margin-top:.5em}
+
+/* B applies NO colour inside any equation. Its sole "this is the term we
+   added" device is .algo-diff — an amber wash plus an inset left rail,
+   deliberately off-palette, because the accent blue is the link colour and a
+   blue glyph inside math reads as a hyperlink. Chip geometry from
+   .axes-anim-sub .corner. */
+/* B .algo-steps li > .comment — the trailing annotation on a math line.
+   Family pinned to --sans so prose stays in Inter inside the serif .eq. */
+.eq-note{
+  font-family:var(--sans);
+  font-style:normal;font-size:.8rem;
+  color:var(--text-secondary);
+  padding-left:18px;
+  white-space:nowrap;
+}
+
+/* ── 9. TABLES — Reference B ─────────────────────────────────────────────
+   B is the ONLY reference with table rules: C's index.css has none and A has
+   none. Every value below is one of B's declarations, with B's
+   --proj-primary #4485C7 translated to --primary-color #2563eb wherever a
+   tint is derived from the accent.                                      */
+
+/* Caption sits ABOVE the table (academic convention); typography is B's
+   figcaption. `p.` qualifier per the cross-cutting fix. */
+p.tbl-caption{
+  font-size:.88rem;line-height:1.55;
+  color:var(--text-primary);text-align:center;
+  max-width:96%;margin:2rem auto .6rem;
+}
+p.tbl-caption b,p.tbl-caption strong{color:var(--text-primary);font-weight:700;
+                                     font-style:normal}
+
+/* B's ENTIRE narrow-screen strategy: one framed scroll box with an
+   always-visible thin scrollbar, min-width:max-content, nowrap cells — and no
+   media query and no font shrink anywhere. The scrollbar block is the
+   load-bearing part: on macOS/iOS the overlay scrollbar is invisible at rest,
+   so without a tinted 6px thumb the reader gets no signal that a 10-column
+   table scrolls at all. */
+.tbl-scroll{
+  overflow-x:auto;-webkit-overflow-scrolling:touch;
+  width:100%;max-width:100%;
+  margin:0 0 2em;
+  border:1px solid var(--border-color);border-radius:10px;
+  background:#fff;box-shadow:0 1px 2px rgba(15,23,42,.04);
+  scrollbar-width:thin;
+  scrollbar-color:rgba(37,99,235,.35) transparent;
+}
+.tbl-scroll::-webkit-scrollbar{height:6px}
+.tbl-scroll::-webkit-scrollbar-track{background:transparent}
+.tbl-scroll::-webkit-scrollbar-thumb{background:rgba(37,99,235,.35);border-radius:999px}
+
+table{
+  width:100%;
+  border-collapse:separate;border-spacing:0;   /* B */
+  margin:0;background:#fff;
+  font-family:var(--sans);font-size:.88rem;line-height:1.4;
+  font-variant-numeric:tabular-nums;
+}
+/* Replaces the two hand-picked pixel floors (min-width:660px and
+   table.compact{min-width:520px}). The table becomes exactly as wide as its
+   content needs: never forces a scrollbar when it fits, never compresses
+   columns when it does not. This is why .compact no longer has a rule. */
+.tbl-scroll > table{min-width:max-content}
+
+/* Numeric cells are CENTRED. B right-aligns no table cell anywhere in its
+   269 rules; the previous text-align:right had no reference support.
+   One uniform 9px 12px on every cell — B has no first/last-child gutters,
+   and nowrap stays on EVERY cell because that is what makes max-content and
+   the scroll frame work. */
+th,td{
+  padding:9px 12px;
+  text-align:center;vertical-align:middle;
+  border-bottom:1px solid var(--border-color);
+  white-space:nowrap;
+}
+
+/* B makes the header DARKER than body text (#0a1f44); the previous rule
+   de-emphasised it with caption grey. Weight 600 not 700, .74rem not .78rem,
+   plus B's uppercase + .04em header signature, a soft vertical gradient
+   instead of a flat fill, and a 2px rule instead of 1.5px.
+   position:sticky is NOT carried over — the container scrolls horizontally
+   only, so it is inert here (and in B). */
+thead th{
+  background:linear-gradient(to bottom,#f7f9fc,#eef2f7);
+  color:#0a1f44;
+  font-weight:600;font-size:.74rem;
+  text-transform:uppercase;letter-spacing:.04em;
+  border-bottom:2px solid var(--border-color);
+}
+thead th:first-child{text-align:left}
+
+/* Label column: left, weight 600, persistently tinted so it stays readable as
+   an anchor while the table is scrolled sideways. B does this on
+   tbody td:first-child; here every body row opens with <th scope="row">. */
+tbody th{
+  text-align:left;font-weight:600;color:var(--text-primary);
+  background:rgba(248,250,253,.6);
+}
+.indent{padding-left:2rem!important}
+
+/* Zebra on the numeric cells only — the label column carries its own tint.
+   Ten-row, ten-column tables are unreadable without it. .group and .ours are
+   excluded so the grey emphasis rows still win. */
+tbody tr:nth-child(even):not(.group):not(.ours) td{background:rgba(248,250,253,.45)}
+
+/* B's row hover, 6% on data cells / 10% on the label cell, translated from
+   B's #4485C7 to --primary-color #2563eb. */
+tbody tr:hover:not(.group):not(.ours) td{background:rgba(37,99,235,.06)}
+tbody tr:hover:not(.group):not(.ours) th{background:rgba(37,99,235,.10)}
+
+/* Section rows: a light tint, never a near-black band (decision 3). */
+tbody tr.group td{
+  background:var(--background-accent);color:var(--text-primary);
+  font-size:.78rem;font-weight:700;letter-spacing:.06em;text-transform:uppercase;
+  text-align:left;padding:.45rem .7rem .45rem 1.1rem;
+}
+
+/* DELIBERATE DECISION 2 — the paper's only in-table emphasis device is
+   \rowcolor{gray!20}, a neutral grey row tint. B's blue tint and B's per-cell
+   `tbody td strong{color:accent}` are deliberately NOT adopted.
+   Moved off the <tr> onto the cells, with a :hover twin, because the new
+   zebra and hover rules would otherwise out-specify a tr-level background. */
+tbody tr.ours td,tbody tr.ours th,
+tbody tr.ours:hover td,tbody tr.ours:hover th{
+  background:var(--background-accent);
+}
+
+/* B: the last row must not draw a 1px rule into the rounded bottom edge of
+   the scroll frame. `th` included because our first body cell is a <th>. */
+tbody tr:last-child td,tbody tr:last-child th{border-bottom:none}
+
+/* The old @media(max-width:768px) table{font-size:.82rem} / th,td{padding:.45rem}
+   shrink is dropped: no reference supports it, and shrinking type is the
+   wrong lever once the table is guaranteed to scroll. Only the .tbl-hint
+   reveal is kept — the class has no reference analogue but it is a harmless
+   affordance that reinforces B's scroll model. `p.` qualifier as above. */
+p.tbl-hint{display:none}
+@media(max-width:768px){
+  p.tbl-hint{display:block;font-size:.8rem;font-style:normal;line-height:1.55;
+             color:var(--text-secondary);margin:.4rem 0 1.5rem;text-align:center}
+  /* C: .content.has-text-justified{font-size:1rem} at this breakpoint —
+     the desktop prose scale was taken from C but its mobile step was not. */
+  .abstract,.section p,.goals li{font-size:1rem}
+}
+
+/* ── 10. BIBTEX — light surface (decision 3) ─────────────────────────── */
+.bib{position:relative}
+.bib pre{
+  background:var(--background-accent);color:var(--text-primary);
+  border:1px solid var(--border-color);border-radius:10px;
+  padding:1.4rem 1.3rem;overflow-x:auto;margin:0;
+  font-family:var(--mono);font-size:.9rem;line-height:1.65;   /* C pre */
+}
+.copy{
+  position:absolute;top:.85rem;right:.85rem;
+  font-family:var(--sans);font-size:.9rem;font-weight:600;  /* C .copy-bibtex-btn;
+      .78rem was the table-header/eyebrow size, not a button size */
+  background:#fff;color:var(--text-primary);
+  border:1px solid var(--border-color);border-radius:8px;
+  padding:.45rem .75rem;cursor:pointer;transition:var(--transition);
+}
+.copy:hover{background:var(--primary-color);color:#fff;
+            border-color:var(--primary-color)}
+/* C .copy-bibtex-btn.copied{background:#10b981}. Using the accent for the
+   confirmed state made "done" indistinguishable from :hover. */
+.copy.done{background:#10b981;color:#fff;border-color:#10b981}
+
+/* ── 11. FOOTER + SCROLL-TO-TOP ──────────────────────────────────────── */
+/* C .footer{padding:3rem 1.5rem} carries no margin, and neither does A's.
+   The old 2rem margin-top put a 32px white gap between #cite's border-bottom
+   and footer's border-top — two hairlines 32px apart. Now the tinted #cite
+   band hands straight off to the tinted footer. */
+footer{border-top:1px solid var(--border-color);margin-top:0;
+       padding:3rem 1.5rem;background:var(--background-secondary)}
+footer p{font-size:.95rem;                       /* A footer */
+         line-height:1.7;color:var(--text-secondary);   /* C .footer .content */
+         margin:0 0 .6em;text-align:center}
+
+/* C .scroll-to-top is a FILLED accent button that darkens on hover. The old
+   rule had a white rest state (no counterpart in any reference) and used C's
+   rest state as its hover — the whole interaction was shifted one step. */
+.scroll-to-top{
+  position:fixed;bottom:1.5rem;right:1.5rem;z-index:60;
+  width:44px;height:44px;border-radius:50%;
+  border:none;background:var(--primary-color);color:#fff;
+  cursor:pointer;display:grid;place-items:center;
+  opacity:0;visibility:hidden;transform:translateY(8px);
+  transition:var(--transition);box-shadow:var(--shadow-lg);
+}
+.scroll-to-top.visible{opacity:1;visibility:visible;transform:none}
+.scroll-to-top:hover{background:var(--primary-hover);color:#fff}
+.scroll-to-top svg{width:16px;height:16px}
+
+@media(prefers-reduced-motion:reduce){
+  html{scroll-behavior:auto}
+  *,*::before,*::after{animation-duration:.01ms!important;
+    animation-iteration-count:1!important;transition-duration:.01ms!important}
+}
+@media(prefers-reduced-transparency:reduce){
+  header{background:#fff;backdrop-filter:none;-webkit-backdrop-filter:none}
+}
+
+/* ══════════════════════════════════════════════════════════════════════
+   ── SA ADDITIONS — Split Adaptation for Pre-trained ViTs (CVPR 2025) ─────
+   Layered AFTER the shared shell above; on any selector collision these win
+   by later source order (equal specificity). Everything above is the
+   reference-driven shell; everything here traces to the SA paper's own
+   emphasis devices or an explicit layout need for this page.
+   ══════════════════════════════════════════════════════════════════════ */
+
+/* Title "Split Adaptation for Pre-trained Vision Transformers" is ~48 chars
+   and wraps to two lines inside the 763.2px column on its own, so the h1
+   break-out (scoped rule earlier in this file) is DISABLED — the title stays
+   on the content measure. Same selector, placed later, so it wins. */
+.hero .column.is-four-fifths > h1{
+  position:static;left:auto;transform:none;width:auto;max-width:100%;
+}
+@media(max-width:1024px){
+  .hero .column.is-four-fifths > h1{width:auto;left:auto;transform:none}
+}
+
+/* Author / affiliation superscripts + equal-contribution marker. */
+.authors sup,.affil sup{font-weight:600}
+.eqmark{color:var(--primary-color)}
+
+/* Main results table emphasis — MIRRORS the paper's LaTeX exactly:
+     best   = \blue{\textbf{...}}  -> blue + bold
+     second = \textbf{...}         -> bold
+   The paper's \blue is pure blue; mapped to --primary-color to stay on the
+   page palette. NOTE this RE-ADOPTS blue on purpose (contrast decision 2 in
+   the shell header, which forbade an INVENTED blue): here blue IS the paper's
+   own device. No other table on the page carries in-cell emphasis, because no
+   other paper table does (rule 6). */
+.best{color:var(--primary-color);font-weight:700}
+.second{font-weight:700}
+/* the +/-std stays quiet even inside a blue best cell (explicit rule on the
+   span beats the inherited cell colour). */
+.pm{font-weight:400;font-size:.8em;color:var(--text-secondary);margin-left:1px}
+
+/* "SA (ours)" row divider — the paper sets SA apart with a \midrule, not a
+   row tint (it has NO \rowcolor). Reproduce that as a top rule only; no tint,
+   so no emphasis device is invented. */
+tbody tr.sep td,tbody tr.sep th{border-top:2px solid var(--text-light)}
+
+/* Two small tables side by side (client cost + component ablation). */
+.two-col{display:grid;grid-template-columns:1fr 1fr;gap:1.25rem 1.5rem;
+         align-items:start;margin:.5rem 0 1.5rem}
+.two-col-item{min-width:0}
+.two-col p.tbl-caption{margin-top:0}
+.two-col .tbl-scroll{margin-bottom:0}
+@media(max-width:680px){.two-col{grid-template-columns:1fr;gap:1.5rem}}
+
+/* Reconstruction image grids (Fig 4 FORA defense, Fig 5 noise ablation).
+   The paper draws these as table floats; shown here as figures (skill: "if
+   it's a figure, show the figure"). One outer frame, one caption below. */
+.recon{margin:1.4em auto .3em;padding:14px 16px 12px;background:#fff;
+       border:1px solid var(--border-color);border-radius:8px;
+       box-shadow:0 1px 3px rgba(15,23,42,.04)}
+.recon-grid{display:grid;gap:8px 10px;align-items:center}
+.recon-3col{grid-template-columns:auto 1fr 1fr 1fr}
+.recon-1col{grid-template-columns:auto 1fr}
+.recon-colhead{font-size:.74rem;font-weight:600;text-transform:uppercase;
+               letter-spacing:.04em;color:#0a1f44;text-align:center}
+.recon-rowlab{font-size:.78rem;font-weight:600;color:var(--text-primary);
+              text-align:right;padding-right:6px;line-height:1.2}
+.recon-cell{display:flex;flex-direction:column;align-items:center;gap:4px;min-width:0}
+.recon-cell img{width:100%;height:auto;display:block;border:1px solid var(--border-color);
+                border-radius:4px;box-shadow:none;background:#fff}
+.recon-m{font-size:.72rem;line-height:1.3;color:var(--text-secondary);
+         font-variant-numeric:tabular-nums;white-space:nowrap}
+.recon-m.strong{color:var(--primary-color);font-weight:600}
+@media(max-width:680px){
+  .recon-colhead{font-size:.64rem}
+  .recon-rowlab{font-size:.66rem;padding-right:4px}
+  .recon-m{font-size:.62rem}
+  .recon-grid{gap:6px 6px}
+}
+
+/* Fig 2 is the central architecture diagram (2:1); let it fill the content
+   column (763px -> 381px tall) for legibility, above the generic 300px cap. */
+.figure-block.framework img{max-width:100%;max-height:420px}
