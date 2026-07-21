@@ -756,3 +756,9 @@ tbody tr.sep td,tbody tr.sep th{border-top:2px solid var(--text-light)}
 /* Fig 2 is the central architecture diagram (2:1); let it fill the content
    column (763px -> 381px tall) for legibility, above the generic 300px cap. */
 .figure-block.framework img{max-width:100%;max-height:420px}
+
+/* Section eyebrow = the nav label, so a nav click lands on a section that
+   visibly announces that label above its descriptive heading. p. qualifier
+   required: bare .kicker (0,1,0) would lose to .section p (0,1,1). */
+p.kicker{font-size:.78rem;font-weight:700;letter-spacing:.14em;text-transform:uppercase;
+         color:var(--primary-color);margin:0 0 .5rem;line-height:1.2;text-align:left}
